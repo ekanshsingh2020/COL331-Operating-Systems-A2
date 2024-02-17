@@ -71,6 +71,21 @@ install_trans(void)
     if (LOG_FLAG == 5) {
       if (tail == log.lh.n/2) panic("[UNDOLOG] Panic in install_trans type 5");
     }
+    struct buf *dbuf = bread(log.dev, log.lh.block[tail]); // read dst
+    bwrite(dbuf);  // write dst to disk
+    brelse(dbuf);
+  }
+}
+
+static void
+our_install_trans(void)
+{
+  int tail;
+
+  for (tail = 0; tail < log.lh.n; tail++) {
+    if (LOG_FLAG == 5) {
+      if (tail == log.lh.n/2) panic("[UNDOLOG] Panic in install_trans type 5");
+    }
     struct buf *lbuf = bread(log.dev, log.start+tail+1); // read log block
     struct buf *dbuf = bread(log.dev, log.lh.block[tail]); // read dst
     memmove(dbuf->data, lbuf->data, BSIZE);  // copy block to dst
@@ -115,7 +130,7 @@ static void
 recover_from_log(void)
 {
   read_head();
-  install_trans(); // if committed, copy from log to disk
+  our_install_trans(); // if committed, copy from log to disk
   log.lh.n = 0;
   write_head(); // clear the log
 }
@@ -186,4 +201,12 @@ log_write(struct buf *b)
   if (i == log.lh.n)
     log.lh.n++;
   b->flags |= B_DIRTY; // prevent eviction
+}
+
+void 
+our_bread(struct buf *b) {
+  struct buf * bcopy = bread(log.dev, log.start + log.lh.n + 1);
+  memmove(bcopy->data, b->data, BSIZE);
+  bwrite(bcopy);
+  brelse(bcopy);
 }
